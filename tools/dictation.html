@@ -34,7 +34,7 @@
     line-height:1.18; min-height:1.18em; color:var(--ink);
     transition:opacity .18s;
   }
-  .word.mask{color:transparent;background:#eef1f6;border-radius:12px;user-select:none}
+  .word.mask{color:#dbe2ee;letter-spacing:.16em}
   .hint{font-size:13px;color:var(--sub);margin-top:8px;min-height:18px}
   .hint b{color:var(--brand);font-weight:600}
 
@@ -269,8 +269,9 @@
     pctText.textContent = p + "%";
     var w = words[idx];
     if(w){
-      wordShow.textContent = w;
-      wordShow.classList.toggle("mask", maskChk.checked);
+      var masked = !!maskChk.checked;
+      wordShow.textContent = masked ? "● ● ●" : w;
+      wordShow.classList.toggle("mask", masked);
       hintLine.innerHTML = "每个词念 <b>"+repSel.value+"</b> 遍，间隔 <b>"+gapSel.value+"</b> 秒";
     }else{
       wordShow.textContent = "词表是空的";
