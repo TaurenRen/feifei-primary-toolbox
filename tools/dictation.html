@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>听写播报器 · 小学词语自动听写</title>
+<style>
+  :root{
+    --ink:#12161c; --sub:#5c6675; --line:#e6e9ef;
+    --bg:#f4f6fa; --card:#ffffff; --brand:#1f5eff; --brand-soft:#e8eeff;
+    --ok:#0e9f6e; --warn:#d97706;
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;padding:0}
+  body{
+    background:var(--bg); color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    padding:18px 16px 40px; max-width:760px; margin:0 auto;
+    -webkit-font-smoothing:antialiased;
+  }
+  .hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .logo{width:34px;height:34px;border-radius:9px;background:var(--brand);color:#fff;
+    display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px}
+  .hd h1{font-size:19px;margin:0;letter-spacing:.5px}
+  .hd p{margin:2px 0 0;font-size:12px;color:var(--sub)}
+
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+
+  /* 主舞台 */
+  .stage{padding:22px 16px 18px;text-align:center}
+  .stage .meta{display:flex;justify-content:space-between;font-size:12.5px;color:var(--sub);margin-bottom:10px}
+  .word{
+    font-size:clamp(38px,13vw,64px); font-weight:800; letter-spacing:.06em;
+    line-height:1.18; min-height:1.18em; color:var(--ink);
+    transition:opacity .18s;
+  }
+  .word.mask{color:transparent;background:#eef1f6;border-radius:12px;user-select:none}
+  .hint{font-size:13px;color:var(--sub);margin-top:8px;min-height:18px}
+  .hint b{color:var(--brand);font-weight:600}
+
+  .barwrap{height:8px;background:#eef1f6;border-radius:99px;overflow:hidden;margin:16px 0 6px}
+  .bar{height:100%;width:0;background:linear-gradient(90deg,#1f5eff,#4b86ff);border-radius:99px;transition:width .35s}
+  .pct{font-size:12px;color:var(--sub);text-align:right}
+
+  /* 按钮区 */
+  .btns{display:grid;grid-template-columns:1.4fr 1fr;gap:10px;margin-top:14px}
+  .btns .row2{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;grid-column:1/-1}
+  button{
+    font-family:inherit;font-size:15px;font-weight:600;border:none;border-radius:12px;
+    padding:13px 10px;cursor:pointer;transition:transform .08s,background .15s;
+  }
+  button:active{transform:scale(.97)}
+  button:disabled{opacity:.42;cursor:not-allowed}
+  .primary{background:var(--brand);color:#fff;font-size:17px}
+  .ghost{background:#f1f4f9;color:#33404f;border:1px solid var(--line)}
+  .mini{background:#f7f8fb;color:#3d4756;border:1px solid var(--line);font-size:14px;padding:11px 6px}
+
+  /* 设置 */
+  .setgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+  .field{display:flex;flex-direction:column;gap:5px}
+  .field label{font-size:12.5px;color:var(--sub)}
+  .field input,.field select{
+    font-family:inherit;font-size:15px;padding:10px;border:1px solid var(--line);
+    border-radius:10px;background:#fff;color:var(--ink);width:100%
+  }
+  .switch{display:flex;align-items:center;justify-content:space-between;
+    padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:#fff;font-size:14px}
+  .switch input{width:44px;height:24px;appearance:none;background:#dfe4ec;border-radius:99px;position:relative;transition:.2s;cursor:pointer}
+  .switch input:checked{background:var(--brand)}
+  .switch input::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;background:#fff;border-radius:50%;transition:.2s}
+  .switch input:checked::after{left:22px}
+
+  .sec-title{font-size:13px;font-weight:700;color:#33404f;margin:0 0 10px;display:flex;align-items:center;gap:6px}
+  .sec-title i{width:3px;height:14px;background:var(--brand);border-radius:2px;display:inline-block}
+
+  textarea{
+    width:100%;height:150px;padding:12px;font-size:15px;line-height:1.7;
+    border:1px solid var(--line);border-radius:12px;resize:vertical;
+    font-family:inherit;color:var(--ink);background:#fff
+  }
+  .tools{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+  .tools button{flex:1;min-width:110px;background:#f7f8fb;border:1px solid var(--line);
+    color:#3d4756;font-size:13.5px;padding:10px;font-weight:500}
+
+  .msg{font-size:13px;color:var(--warn);min-height:0;margin-top:10px}
+  .tip{font-size:12px;line-height:1.7;color:#8a94a3;margin-top:12px}
+  .foot{text-align:center;font-size:12px;color:#9aa3b0;margin-top:18px;line-height:1.8}
+  .foot b{color:#7d8797}
+  @media (max-width:420px){
+    body{padding:14px 12px 34px}
+    .btns{grid-template-columns:1fr}
+    .setgrid{grid-template-columns:1fr}
+  }
+</style>
+</head>
+<body>
+
+<div class="hd">
+  <div class="logo">听</div>
+  <div>
+    <h1>听写播报器</h1>
+    <p>把课本词表交给它，它按你设的间隔念给孩子听</p>
+  </div>
+</div>
+
+<!-- 主舞台 -->
+<div class="card stage">
+  <div class="meta">
+    <span id="counterText">第 0 / 0 个</span>
+    <span id="clockText">—</span>
+  </div>
+
+  <div class="word" id="wordShow">准备好了没</div>
+  <div class="hint" id="hintLine">点下面的「开始播报」，每个词念 <b id="repeatEcho">2</b> 遍，间隔 <b id="gapEcho">40</b> 秒</div>
+
+  <div class="barwrap"><div class="bar" id="bar"></div></div>
+  <div class="pct" id="pctText">0%</div>
+
+  <div class="btns">
+    <button class="primary" id="playBtn">开始播报</button>
+    <button class="ghost" id="resetBtn">重头再来</button>
+    <div class="row2">
+      <button class="mini" id="prevBtn">上一个</button>
+      <button class="mini" id="againBtn">再念一遍</button>
+      <button class="mini" id="nextBtn">下一个</button>
+    </div>
+  </div>
+
+  <div class="msg" id="msgBox"></div>
+</div>
+
+<!-- 设置 -->
+<div class="card">
+  <div class="sec-title"><i></i>播报设置</div>
+  <div class="setgrid">
+    <div class="field">
+      <label>每个词之间隔多久</label>
+      <select id="gapSel">
+        <option value="10">10 秒（低年级）</option>
+        <option value="15">15 秒</option>
+        <option value="20">20 秒</option>
+        <option value="25">25 秒</option>
+        <option value="30">30 秒</option>
+        <option value="40" selected>40 秒（默认）</option>
+        <option value="50">50 秒</option>
+        <option value="60">60 秒（写得慢）</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>每个词念几遍</label>
+      <select id="repSel">
+        <option value="1">1 遍</option>
+        <option value="2" selected>2 遍</option>
+        <option value="3">3 遍</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>语速</label>
+      <select id="rateSel">
+        <option value="0.75">慢（一二年级）</option>
+        <option value="0.88" selected>正常偏慢</option>
+        <option value="1">正常</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>朗读声音</label>
+      <select id="voiceSel"><option value="">跟随系统默认</option></select>
+    </div>
+  </div>
+  <div class="switch" style="margin-top:12px">
+    <span>遮住屏幕上的字（只听不看，防抄）</span>
+    <input type="checkbox" id="maskChk">
+  </div>
+  <div class="switch" style="margin-top:8px">
+    <span>打乱顺序（避免背词序）</span>
+    <input type="checkbox" id="shuffleChk">
+  </div>
+</div>
+
+<!-- 词表 -->
+<div class="card">
+  <div class="sec-title"><i></i>词语表（一行一个）</div>
+  <textarea id="wordArea" spellcheck="false" placeholder="毁灭&#10;众星拱月&#10;环绕&#10;殿堂&#10;象征">毁灭
+众星拱月
+环绕
+殿堂
+象征
+不可估量
+举世闻名
+仿照
+漫步
+亭台楼阁
+天南海北
+瑰宝
+漫游
+销毁
+诗情画意
+饱览
+奇珍异宝
+奉命
+精华
+侵略
+损失
+组织
+宏伟
+欧洲
+潜水
+奔腾
+野兽
+轮胎
+皇帝
+旅途
+飞泻</textarea>
+  <div class="tools">
+    <button id="saveBtn">保存词表</button>
+    <button id="clearBtn">清空</button>
+    <button id="shuffleBtn">打乱词表</button>
+  </div>
+  <div class="tip">
+    词表存在你自己的浏览器里，关掉页面也不会丢。换一篇课文直接全选替换就行。
+  </div>
+</div>
+
+<div class="foot">
+  <b>狒狒的小学工具箱</b> · 第一个工具<br>
+  开源地址：github.com/TaurenRen/feifei-primary-toolbox
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var synth = window.speechSynthesis;
+  var $ = function(id){ return document.getElementById(id); };
+
+  var wordShow=$("wordShow"), hintLine=$("hintLine"), bar=$("bar"), pctText=$("pctText"),
+      counterText=$("counterText"), clockText=$("clockText"), msgBox=$("msgBox"),
+      playBtn=$("playBtn"), resetBtn=$("resetBtn"), prevBtn=$("prevBtn"),
+      againBtn=$("againBtn"), nextBtn=$("nextBtn"),
+      gapSel=$("gapSel"), repSel=$("repSel"), rateSel=$("rateSel"), voiceSel=$("voiceSel"),
+      maskChk=$("maskChk"), shuffleChk=$("shuffleChk"), wordArea=$("wordArea"),
+      saveBtn=$("saveBtn"), clearBtn=$("clearBtn"), shuffleBtn=$("shuffleBtn"),
+      gapEcho=$("gapEcho"), repeatEcho=$("repeatEcho");
+
+  var words=[], idx=0, running=false, paused=false,
+      gapTimer=null, tickTimer=null, curVoice=null, voicesLoaded=false;
+
+  /* ---------- 词表 ---------- */
+  function parseWords(){
+    return wordArea.value.split(/\r?\n/).map(function(s){return s.trim();}).filter(Boolean);
+  }
+  function loadWords(keepIdx){
+    words = parseWords();
+    if(!keepIdx) idx = 0;
+    if(idx > words.length) idx = Math.max(0, words.length-1);
+    render();
+  }
+  function shuffleArray(a){
+    for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i];a[i]=a[j];a[j]=t; }
+    return a;
+  }
+
+  /* ---------- 渲染 ---------- */
+  function render(){
+    var total = words.length;
+    var cur = total ? Math.min(idx+1, total) : 0;
+    counterText.textContent = "第 " + cur + " / " + total + " 个";
+    var p = total ? Math.round((idx/total)*100) : 0;
+    bar.style.width = p + "%";
+    pctText.textContent = p + "%";
+    var w = words[idx];
+    if(w){
+      wordShow.textContent = w;
+      wordShow.classList.toggle("mask", maskChk.checked);
+      hintLine.innerHTML = "每个词念 <b>"+repSel.value+"</b> 遍，间隔 <b>"+gapSel.value+"</b> 秒";
+    }else{
+      wordShow.textContent = "词表是空的";
+      wordShow.classList.remove("mask");
+    }
+    gapEcho.textContent = gapSel.value;
+    repeatEcho.textContent = repSel.value;
+    playBtn.disabled = total === 0;
+    prevBtn.disabled = idx <= 0;
+    nextBtn.disabled = idx >= total-1;
+  }
+
+  /* ---------- 语音 ---------- */
+  function pickVoice(){
+    if(!synth) return null;
+    var list = synth.getVoices() || [];
+    var zh = list.filter(function(v){ return /zh|cn|Chinese/i.test(v.lang) || /中文|晓|慧|美|Mandarin/i.test(v.name); });
+    if(voiceSel.value){
+      for(var i=0;i<list.length;i++){ if(list[i].name===voiceSel.value) return list[i]; }
+    }
+    return zh[0] || list[0] || null;
+  }
+  function fillVoices(){
+    if(!synth) return;
+    var list = synth.getVoices() || [];
+    if(!list.length) return;
+    var zh = list.filter(function(v){ return /zh|cn|Chinese/i.test(v.lang); });
+    var pool = zh.length ? zh : list;
+    var keep = voiceSel.value || curVoice && curVoice.name || "";
+    voiceSel.innerHTML = '<option value="">跟随系统默认</option>';
+    pool.forEach(function(v){
+      var o = document.createElement("option");
+      o.value = v.name;
+      o.textContent = v.name + " · " + v.lang + (v.localService ? "" : "（在线）");
+      voiceSel.appendChild(o);
+    });
+    if(keep){
+      for(var i=0;i<voiceSel.options.length;i++){
+        if(voiceSel.options[i].value===keep){ voiceSel.value=keep; break; }
+      }
+    }
+    curVoice = pickVoice();
+    voicesLoaded = true;
+  }
+  if(synth){
+    fillVoices();
+    synth.onvoiceschanged = fillVoices;
+    setTimeout(function(){ if(!voicesLoaded) fillVoices(); }, 700);
+    setTimeout(fillVoices, 1800);
+  }
+
+  function speak(text, done){
+    if(!synth || typeof SpeechSynthesisUtterance === "undefined"){
+      msgBox.textContent = "这个浏览器不支持朗读，换成 Chrome 或 Edge 打开";
+      return;
+    }
+    curVoice = pickVoice();
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = (curVoice && curVoice.lang) || "zh-CN";
+    if(curVoice) u.voice = curVoice;
+    u.rate = parseFloat(rateSel.value) || 0.9;
+    u.pitch = 1;
+    u.volume = 1;
+    u.onerror = function(e){
+      if(e && e.error === "not-allowed"){
+        msgBox.textContent = "浏览器拦住了自动朗读：请先在页面任意位置点一下";
+        stop();
+      }else if(e && e.error === "synthesis-failed"){
+        msgBox.textContent = "语音没加载出来，换个「朗读声音」再试";
+      }
+    };
+    if(done) u.onend = done;
+    synth.speak(u);
+  }
+
+  /* ---------- 播放循环 ---------- */
+  function clearTimers(){
+    if(gapTimer){ clearTimeout(gapTimer); gapTimer=null; }
+    if(tickTimer){ clearInterval(tickTimer); tickTimer=null; }
+  }
+
+  function countdown(sec){
+    var left = sec;
+    clockText.textContent = "下一个：还有 " + left + " 秒";
+    if(tickTimer) clearInterval(tickTimer);
+    tickTimer = setInterval(function(){
+      left--;
+      if(left<=0){ clearInterval(tickTimer); tickTimer=null; clockText.textContent="准备下一个"; return; }
+      clockText.textContent = "下一个：还有 " + left + " 秒";
+    }, 1000);
+  }
+
+  function playCurrent(){
+    if(idx >= words.length){ finish(); return; }
+    render();
+    var times = parseInt(repSel.value,10) || 1;
+    var gap = parseFloat(gapSel.value) || 40;
+    var word = words[idx];
+    var n = 0;
+
+    function once(){
+      n++;
+      speak(word, function(){
+        if(n < times){
+          setTimeout(once, 650);
+        }else{
+          countdown(gap);
+          gapTimer = setTimeout(function(){
+            if(!running) return;
+            idx++;
+            playCurrent();
+          }, gap*1000);
+        }
+      });
+    }
+    once();
+  }
+
+  function start(){
+    if(!words.length){ msgBox.textContent="词表是空的，先粘几个词进去"; return; }
+    if(!synth){ msgBox.textContent="这个浏览器不支持朗读，换 Chrome / Edge"; return; }
+    msgBox.textContent = "";
+    running = true; paused = false;
+    playBtn.textContent = "暂停";
+    playBtn.disabled = false;
+    playCurrent();
+  }
+
+  function pause(){
+    running = false; paused = true;
+    clearTimers();
+    if(synth) synth.cancel();
+    playBtn.textContent = "继续播报";
+    clockText.textContent = "已暂停";
+  }
+
+  function resume(){
+    paused = false;
+    start();
+  }
+
+  function stop(){
+    running = false; paused = false;
+    clearTimers();
+    if(synth) synth.cancel();
+    playBtn.textContent = "开始播报";
+    clockText.textContent = "—";
+  }
+
+  function finish(){
+    stop();
+    clockText.textContent = "全部念完了";
+    hintLine.innerHTML = "全部 <b>"+words.length+"</b> 个词已播报完毕";
+    wordShow.textContent = "收工";
+    wordShow.classList.remove("mask");
+    bar.style.width = "100%";
+    pctText.textContent = "100%";
+    synth.speak("听写结束，检查一下有没有漏掉的");
+  }
+
+  /* ---------- 事件 ---------- */
+  playBtn.onclick = function(){
+    if(running){ pause(); }
+    else if(paused){ resume(); }
+    else { start(); }
+  };
+
+  resetBtn.onclick = function(){
+    stop(); loadWords(false);
+    clockText.textContent = "—";
+    msgBox.textContent = "";
+  };
+
+  prevBtn.onclick = function(){
+    var wasRunning = running;
+    stop();
+    idx = Math.max(0, idx-1);
+    render();
+    if(wasRunning) { setTimeout(start, 250); }
+    else { speak(words[idx]||""); }
+  };
+
+  againBtn.onclick = function(){
+    var wasRunning = running;
+    stop();
+    var word = words[idx];
+    if(!word) return;
+    speak(word); setTimeout(function(){ speak(word); }, 650);
+    if(wasRunning) { setTimeout(start, 1600); }
+  };
+
+  nextBtn.onclick = function(){
+    var wasRunning = running;
+    stop();
+    idx = Math.min(words.length-1, idx+1);
+    render();
+    if(wasRunning) { setTimeout(start, 250); }
+    else { speak(words[idx]||""); }
+  };
+
+  gapSel.onchange = function(){ gapEcho.textContent = this.value; render(); };
+  repSel.onchange = function(){ repeatEcho.textContent = this.value; render(); };
+  rateSel.onchange = function(){ curVoice = pickVoice(); };
+  voiceSel.onchange = function(){ curVoice = pickVoice(); };
+  maskChk.onchange = function(){ render(); };
+  shuffleChk.onchange = function(){
+    if(this.checked){ loadWords(false); shuffleArray(words); idx=0; render(); }
+    else { loadWords(false); }
+    if(running){ stop(); }
+  };
+
+  wordArea.oninput = function(){ if(!running){ loadWords(false); } };
+
+  saveBtn.onclick = function(){
+    try{
+      localStorage.setItem("feifei_dictation_words", wordArea.value);
+      localStorage.setItem("feifei_dictation_gap", gapSel.value);
+      localStorage.setItem("feifei_dictation_rep", repSel.value);
+      msgBox.textContent = "";
+      saveBtn.textContent = "已保存";
+      setTimeout(function(){ saveBtn.textContent="保存词表"; }, 1400);
+    }catch(e){ msgBox.textContent = "这个浏览器不让存，下次要重新粘贴"; }
+  };
+
+  clearBtn.onclick = function(){
+    if(!confirm("清空词表？")) return;
+    stop(); wordArea.value = ""; loadWords(false);
+  };
+
+  shuffleBtn.onclick = function(){
+    loadWords(false); shuffleArray(words); idx=0; stop(); render();
+    msgBox.textContent = "顺序已打乱（第 " + (words.length?1:0) + " 个重新开始）";
+  };
+
+  window.addEventListener("beforeunload", function(){ if(synth) synth.cancel(); });
+
+  /* ---------- 恢复上次的设置 ---------- */
+  try{
+    var w = localStorage.getItem("feifei_dictation_words");
+    if(w) wordArea.value = w;
+    var g = localStorage.getItem("feifei_dictation_gap");
+    if(g) gapSel.value = g;
+    var r = localStorage.getItem("feifei_dictation_rep");
+    if(r) repSel.value = r;
+  }catch(e){}
+
+  loadWords(false);
+  wordShow.textContent = words.length ? words[0] : "词表是空的";
+})();
+</script>
+</body>
+</html>
