@@ -354,14 +354,25 @@
   }
 
   function countdown(sec){
-    var left = sec;
-    clockText.textContent = "下一个：还有 " + left + " 秒";
+    var totalN = words.length || 1;
+    var base = (idx/totalN)*100;
+    var step = 100/totalN;
+    var t0 = Date.now(), lastLeft = -1;
+    clockText.textContent = "下一个：还有 " + sec + " 秒";
     if(tickTimer) clearInterval(tickTimer);
     tickTimer = setInterval(function(){
-      left--;
-      if(left<=0){ clearInterval(tickTimer); tickTimer=null; clockText.textContent="准备下一个"; return; }
-      clockText.textContent = "下一个：还有 " + left + " 秒";
-    }, 1000);
+      var el = (Date.now() - t0)/1000;
+      var left = Math.max(0, Math.ceil(sec - el));
+      if(left !== lastLeft){
+        lastLeft = left;
+        clockText.textContent = left > 0 ? "下一个：还有 " + left + " 秒" : "准备下一个";
+      }
+      var frac = Math.min(1, el/sec);
+      var p = Math.min(100, base + step*frac);
+      bar.style.width = p.toFixed(1) + "%";
+      pctText.textContent = Math.round(p) + "%";
+      if(el >= sec){ clearInterval(tickTimer); tickTimer = null; }
+    }, 100);
   }
 
   function playCurrent(){
